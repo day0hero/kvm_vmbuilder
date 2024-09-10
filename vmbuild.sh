@@ -1,7 +1,8 @@
 #######################################################################################################
 
-disk_pth=/var/lib/libvirt/images
-back_dsk=rhel-server-7.5-x86_64-kvm.qcow2
+IMGDIR=/var/lib/libvirt/images
+BKGIMG=rhel-9.4-x86_64-kvm.qcow2
+OSVAR=rhel9.0
 
 if [ $UID != '0' ]; 
      then echo "You must be root or run as sudo"
@@ -9,47 +10,47 @@ if [ $UID != '0' ];
 fi
 
 echo "What is the name of this virtual machine?"
-read name
+read NAME
 
-echo "What is the domain name? ex: redhat.local clusterfudge.net"
-read domain
+echo "What is the domain name? ex: redhat.local, jrickard.io"
+read DOMAIN
 
-echo "How much ram in MB for ${name}?"
-read ram
+echo "How much ram in MB for ${NAME}?"
+read RAM
 
-echo "How many cpus for ${name}?"
-read vcpus
+echo "How many cpus for ${NAME}?"
+read VCPUS
 
 echo "What size disk in GB?"
-read disk_size
+read DSKSIZE
 
 echo "A machine will be created with the following characteristics:
-  NAME: ${name}.${domain}
-  RAM: ${ram}
-  CPU: ${vcpus}
-  DISK: ${disk_size}
+  NAME: ${NAME}.${DOMAIN}
+  RAM: ${RAM}
+  CPU: ${VCPUS}
+  DISK: ${DSKSIZE}
 "
 echo "Is this correct? [Y/y|N/n]"
-read ans
-if [ ${ans} == ""]; then
+read ANS
+if [ ${ANS} == ""]; then
 	echo -e "you must enter either Yy|Nn\n"
 fi
 build_vm () {
   echo "Creating disk image"
-  qemu-img create -f qcow2 -b ${disk_pth}/${back_dsk} ${disk_pth}/${name}.qcow2 ${disk_size}G
-  virt-resize --expand /dev/sda1 ${disk_pth}/${back_dsk} ${disk_pth}/${name}.qcow2
-  echo "Setting hostname to ${name}.${domain}"
-  virt-customize -a ${disk_pth}/${name}.qcow2 --hostname ${name}.${domain} --selinux-relabel
+  qemu-img create -f qcow2 -b ${IMGDIR}/${BKGIMG} -F qcow2 ${IMGDIR}/${NAME}.qcow2 ${DSKSIZE}G
+  virt-resize --expand /dev/sda4 ${IMGDIR}/${BKGIMG} ${IMGDIR}/${NAME}.qcow2
+  echo "Setting hostname to ${NAME}.${DOMAIN}"
+  virt-customize -a ${IMGDIR}/${NAME}.qcow2 --hostname ${NAME}.${DOMAIN} --selinux-relabel
   echo "Creating virtual machine"
-  virt-install --name ${name}.${domain} --ram ${ram} --vcpus ${vcpus} --disk path=${disk_pth}/${name}.qcow2,bus=virtio,device=disk,format=qcow2 --import --os-variant rhel7.0 --vnc --noautoconsole --network network:default 
+  virt-install --name ${NAME}.${DOMAIN} --memory ${RAM} --vcpus ${VCPUS} --disk ${IMGDIR}/${NAME}.qcow2,bus=virtio,device=disk,format=qcow2 --import --os-variant ${OSVAR} --graphics spice,listen=127.0.0.1 --noautoconsole --network network=default 
   echo "Gathering access information"
   sleep 20
-  export IPADD="$(virsh domifaddr ${name}.${domain} | egrep -v 'Name|^$' | awk '{print $4}' | awk '$1=$1' | cut -d / -f1)"
-  echo "${name} can be reached via ssh at ${IPADD} using root / redhat"
+  export IPADD="$(virsh domifaddr ${NAME}.${DOMAIN} | egrep -v 'Name|^$' | awk '{print $4}' | awk '$1=$1' | cut -d / -f1)"
+  echo "${NAME} can be reached via ssh at ${IPADD} using root / redhat"
   exit 0
   }
 
- case "${ans}" in
+ case "${ANS}" in
 	N* )
           echo "exiting, re-run"
           ;;
